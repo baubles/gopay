@@ -1,8 +1,8 @@
 package alipay
 
 type AlipayTradeQueryBizModel struct {
-	TradeNo    string `json:"trade_no"`     // 商户订单号
-	OutTradeNo string `json:"out_trade_no"` // 支付宝交易号
+	TradeNo    string `json:"trade_no,omitempty"`     // 商户订单号
+	OutTradeNo string `json:"out_trade_no,omitempty"` // 支付宝交易号
 }
 
 type AlipayTradeQueryResponse struct {

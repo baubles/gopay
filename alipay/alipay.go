@@ -3,7 +3,6 @@ package alipay
 import (
 	"bytes"
 	"crypto"
-	// "crypto/hmac"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -17,48 +16,33 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
 )
 
-var Debug = true
-
-type AlipayRequest struct {
-	method    string // 接口名称
-	NotifyUrl string // 支付宝服务器主动通知商户服务器里指定的页面http
-	ReturnUrl string
-	BizModel  interface{} // 业务参数
-	response  interface{} // 返回数据
-	Version   string      // Api 版本
-}
-
-type AlipayResponse struct {
-	Code    string `json:"code"`     // 网关返回码,详见文档
-	Msg     string `json:"msg"`      // 网关返回码描述,详见文档
-	SubCode string `json:"sub_code"` // 业务返回码,详见文档
-	SubMsg  string `json:"sub_msg"`  // 业务返回码描述,详见文档
-}
+var Debug = false
 
 type AlipayClient struct {
-	ServerUrl  string
-	AppId      string
-	SignType   string
-	Charset    string
-	Format     string
-	PrivateKey string
-	httpClient *http.Client
+	ServerUrl       string
+	AppId           string
+	SignType        string
+	Charset         string
+	Format          string
+	PrivateKey      string
+	AlipayPublicKey string
+	httpClient      *http.Client
 }
 
-func NewAlipayClient(appId string, privateKey string) *AlipayClient {
+func NewAlipayClient(appId, signType, privateKey, alipayPublicKey string) *AlipayClient {
 	return &AlipayClient{
-		ServerUrl:  "https://openapi.alipay.com/gateway.do",
-		AppId:      appId,
-		PrivateKey: privateKey,
-		Format:     FORMAT_JSON,
-		Charset:    CHARSET_UTF8,
-		SignType:   SIGN_TYPE_RSA,
+		ServerUrl:       "https://openapi.alipay.com/gateway.do",
+		AppId:           appId,
+		PrivateKey:      privateKey,
+		AlipayPublicKey: alipayPublicKey,
+		Format:          FORMAT_JSON,
+		Charset:         CHARSET_UTF8,
+		SignType:        signType,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
@@ -79,29 +63,46 @@ func (a *AlipayClient) Do(req *AlipayRequest) (interface{}, error) {
 	if params.Get(CHARSET) != CHARSET_UTF8 {
 		return nil, errors.New("[alipay] charset only support utf8")
 	}
-
-	a.signParams(params)
-
-	var data = make(url.Values)
-	for k, v := range params {
-		data.Add(k, v)
+	reqBody := params.Encode()
+	resp, err := a.httpClient.Post(a.ServerUrl, "application/x-www-form-urlencoded;charset="+a.Charset, strings.NewReader(reqBody))
+	if Debug {
+		log.Printf("[gopay.alipay] request %s\t%s\n", a.ServerUrl, reqBody)
 	}
-	resp, err := a.httpClient.Post(a.ServerUrl, "application/x-www-form-urlencoded;charset="+a.Charset, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("%s\n\t%s\n\t%s\n", a.ServerUrl, data.Encode(), body)
-	err = a.parseResponse(bytes.NewReader(body), req)
+	if Debug {
+		log.Printf("[gopay.alipay] response %s\n", respBody)
+	}
+	err = a.parseResponse(bytes.NewReader(respBody), req)
 	return req.response, err
 }
 
+func (a *AlipayClient) SdkDo(req *AlipayRequest) (string, error) {
+	params, err := a.params(req)
+	if err != nil {
+		return "", err
+	}
+	if params.Has(SIGN_TYPE) {
+		if err := a.signParams(params); err != nil {
+			return "", err
+		}
+	}
+
+	if params.Get(CHARSET) != CHARSET_UTF8 {
+		return "", errors.New("[alipay] charset only support utf8")
+	}
+
+	return params.Encode(), nil
+}
+
 func (a *AlipayClient) params(req *AlipayRequest) (AlipayParams, error) {
-	params := MakeAlipayParams()
+	params := AlipayParams{}
 	params.Put(METHOD, req.method)
 	params.Put(VERSION, req.Version)
 	params.Put(APP_ID, a.AppId)
@@ -133,7 +134,6 @@ func (a *AlipayClient) signParams(params AlipayParams) error {
 		}
 		buffer.WriteString(keys[i] + "=" + params[keys[i]])
 	}
-	log.Println(buffer.String())
 	sign, err := a.sign(buffer.Bytes())
 	if err != nil {
 		return err
@@ -175,12 +175,45 @@ func (a *AlipayClient) sign(data []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(s), nil
 }
 
+func (a *AlipayClient) VerifySign(content []byte, sign string) error {
+	sig, err := base64.StdEncoding.DecodeString(sign)
+	if err != nil {
+		return errors.New("[gopay.alipay] sign decode error, " + err.Error())
+	}
+	block, _ := pem.Decode([]byte(a.AlipayPublicKey))
+	if block == nil {
+		return errors.New("[gopay.alipay] alipay public key pem decode error")
+	}
+
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return errors.New("[gopay.alipay] alipay public key parse error, " + err.Error())
+	}
+
+	var (
+		h          hash.Hash
+		cryptoHash crypto.Hash
+	)
+
+	if a.SignType == SIGN_TYPE_RSA {
+		h = sha1.New()
+		cryptoHash = crypto.SHA1
+	} else {
+		h = sha256.New()
+		cryptoHash = crypto.SHA256
+	}
+
+	h.Write(content)
+	digest := h.Sum(nil)
+	return rsa.VerifyPKCS1v15(pub.(*rsa.PublicKey), cryptoHash, digest, sig)
+}
+
 func (a *AlipayClient) parseResponse(r io.Reader, req *AlipayRequest) error {
 	decoder := json.NewDecoder(r)
 	var (
 		sign       string
 		contentKey string
-		content    []byte
+		content    json.RawMessage
 	)
 	contentKey = strings.Replace(req.method, ".", "_", -1) + RESPONSE_SUFFIX
 	for {
@@ -197,7 +230,7 @@ func (a *AlipayClient) parseResponse(r io.Reader, req *AlipayRequest) error {
 			if t.(string) == SIGN {
 				decoder.Decode(&sign)
 			} else if t.(string) == contentKey {
-				decoder.Decode(&sign)
+				decoder.Decode(&content)
 			} else {
 				var raw json.RawMessage
 				decoder.Decode(&raw)
@@ -207,8 +240,8 @@ func (a *AlipayClient) parseResponse(r io.Reader, req *AlipayRequest) error {
 		}
 	}
 
-	if newSign, _ := a.sign(content); newSign != sign {
-		if newSign, _ = a.sign(bytes.Replace(content, []byte("\\/"), []byte("/"), -1)); newSign != sign {
+	if err := a.VerifySign(content, sign); err != nil {
+		if err := a.VerifySign(bytes.Replace(content, []byte("\\/"), []byte("/"), -1), sign); err != nil {
 			return errors.New("[alipay] sign check fail: check Sign and Data Fail！JSON also！")
 		}
 	}

@@ -2,19 +2,19 @@ package alipay
 
 // 下单参数 参考: https://docs.open.alipay.com/api_1/alipay.trade.create/
 type AlipayTradeCreateBizModel struct {
-	OutTradeNo         string        `json:"out_trade_no"`
-	SellerId           string        `json:"seller_id"`
-	TotalAmount        string        `json:"total_amount"`
-	DiscountableAmount string        `json:"discountable_amount"`
-	Subject            string        `json:"subject"`
-	Body               string        `json:"body"`
-	BuyerId            string        `json:"buyer_id"`
-	GoodsDetail        []GoodsDetail `json:"goods_detail"`
-	OperatorId         string        `json:"operator_id"`
-	StoreId            string        `json:"store_id"`
-	TerminalId         string        `json:"terminal_id"`
-	ExtendParams       string        `json:"extend_params"`
-	TimeoutExpress     string        `json:"timeout_express"`
+	OutTradeNo         string        `json:"out_trade_no,omitempty"`
+	SellerId           string        `json:"seller_id,omitempty"`
+	TotalAmount        string        `json:"total_amount,omitempty"`
+	DiscountableAmount string        `json:"discountable_amount,omitempty"`
+	Subject            string        `json:"subject,omitempty"`
+	Body               string        `json:"body,omitempty"`
+	BuyerId            string        `json:"buyer_id,omitempty"`
+	GoodsDetail        []GoodsDetail `json:"goods_detail,omitempty"`
+	OperatorId         string        `json:"operator_id,omitempty"`
+	StoreId            string        `json:"store_id,omitempty"`
+	TerminalId         string        `json:"terminal_id,omitempty"`
+	ExtendParams       string        `json:"extend_params,omitempty"`
+	TimeoutExpress     string        `json:"timeout_express,omitempty"`
 }
 
 type AlipayTradeCreateResponse struct {

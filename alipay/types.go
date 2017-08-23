@@ -1,12 +1,31 @@
 package alipay
 
-type AlipayParams map[string]string
+import (
+	"net/url"
+)
 
-func MakeAlipayParams() AlipayParams {
-	return make(AlipayParams)
+type AlipayRequest struct {
+	method    string // 接口名称
+	NotifyUrl string // 支付宝服务器主动通知商户服务器里指定的页面http
+	ReturnUrl string
+	BizModel  interface{} // 业务参数
+	response  interface{} // 返回数据
+	Version   string      // Api 版本
 }
 
+type AlipayResponse struct {
+	Code    string `json:"code"`     // 网关返回码,详见文档
+	Msg     string `json:"msg"`      // 网关返回码描述,详见文档
+	SubCode string `json:"sub_code"` // 业务返回码,详见文档
+	SubMsg  string `json:"sub_msg"`  // 业务返回码描述,详见文档
+}
+
+type AlipayParams map[string]string
+
 func (a AlipayParams) Put(key, value string) {
+	if len(value) == 0 && len(key) != 0 {
+		return
+	}
 	a[key] = value
 }
 
@@ -18,6 +37,14 @@ func (a AlipayParams) Get(key string) string {
 func (a AlipayParams) Has(key string) bool {
 	_, ok := a[key]
 	return ok
+}
+
+func (a AlipayParams) Encode() string {
+	values := url.Values{}
+	for k, v := range a {
+		values.Add(k, v)
+	}
+	return values.Encode()
 }
 
 const (

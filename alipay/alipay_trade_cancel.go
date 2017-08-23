@@ -2,8 +2,8 @@ package alipay
 
 // 取消订单参数
 type AlipayTradeCancelBizModel struct {
-	TradeNo    string `json:"trade_no"`     // 商户订单号
-	OutTradeNo string `json:"out_trade_no"` // 支付宝交易号
+	TradeNo    string `json:"trade_no,omitempty"`     // 商户订单号
+	OutTradeNo string `json:"out_trade_no,omitempty"` // 支付宝交易号
 }
 
 type AlipayTradeCancelResponse struct {
@@ -14,7 +14,7 @@ type AlipayTradeCancelResponse struct {
 	Action     string `json:"action"`
 }
 
-func NewTradeCancelRequest(bizModel AlipayTradeCancelBizModel) *AlipayRequest {
+func NewAlipayTradeCancelRequest(bizModel AlipayTradeCancelBizModel) *AlipayRequest {
 	return &AlipayRequest{
 		method:   "alipay.trade.cancel",
 		BizModel: &bizModel,
