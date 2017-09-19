@@ -3,6 +3,9 @@
 *.dll
 *.so
 *.dylib
+alipay_test.go
+wxpay_test.go
+
 
 # Test binary, build with `go test -c`
 *.test
