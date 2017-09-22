@@ -64,7 +64,7 @@ func (self *WXPayClient) SetTslCert(certPEMBlock, keyPEMBlock, rootCAPEMBlock []
 func (self *WXPayClient) Do(req *WXPayRequest) (interface{}, error) {
 	var err error
 	params := self.params(req)
-	self.signParams(params)
+	self.SignParams(params)
 	if req.requireCert && !self.isCertOk {
 		return nil, errors.New("[gopay.wxpay] request require cert")
 	}
@@ -112,16 +112,16 @@ func (self *WXPayClient) params(req *WXPayRequest) WXPayParams {
 
 func (self *WXPayClient) checkSign(params WXPayParams) bool {
 	sign := params.Get(SIGN)
-	self.signParams(params)
+	self.SignParams(params)
 	if sign == params.Get(SIGN) {
 		return true
 	}
 	return false
 }
 
-func (self *WXPayClient) signParams(params WXPayParams) {
+func (self *WXPayClient) SignParams(params WXPayParams) {
 	keys := make([]string, 0, len(params))
-	for key, _ := range params {
+	for key := range params {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)

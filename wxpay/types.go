@@ -23,11 +23,28 @@ const (
 	NONCE_STR             = "nonce_str"
 )
 
+// 错误状态码
+const (
+	CodeSuccess = "SUCCESS"
+	CodeFail    = "FAIL"
+)
+
+// 交易类型
+const (
+	TradeTypeAPP   = "App"
+	TradeTypeJSAPI = "JSAPI"
+	TradeTypeMWEB  = "MWEB"
+)
+
 type WXPayRequest struct {
 	apiUrl         string
 	requireCert    bool
 	bizModel       interface{}
 	responseParser WXPayParamsParser
+}
+
+func (req *WXPayRequest) RequireCert() bool {
+	return req.requireCert
 }
 
 type WXPayResponse struct {
